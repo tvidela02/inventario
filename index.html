@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Inventario</title>
+<!--
+  Ficha del inventario fuera de Google (GitHub Pages). El QR apunta acá: ?id=05
+  Los datos los da el Apps Script (Api.gs) por fetch SIN cookies de Google (credentials: 'omit'),
+  así no hay redirección a /macros/u/N/ cuando el celular tiene varias cuentas de Google.
+  La tarjeta la arma el servidor (Ficha.gs), igual que en la ficha original: acá solo se muestra.
+  Mismo estilo que ESTILO_FICHA_ en Ficha.gs.
+-->
+<style>
+body{font-family:Arial,sans-serif;margin:0;padding:20px;background:#f4f6f8;color:#222}
+.card{background:#fff;border-radius:12px;padding:20px;max-width:480px;margin:auto;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.id{color:#666;font-size:14px}h1{font-size:22px;margin:4px 0 16px}h2{font-size:17px;margin:20px 0 4px}
+table{width:100%;border-collapse:collapse;margin-bottom:16px}
+th{text-align:left;color:#666;font-weight:normal;padding:8px 8px 8px 0;width:40%;vertical-align:top}
+td{padding:8px 0;border-bottom:1px solid #eee}
+.btn{display:block;width:100%;box-sizing:border-box;text-align:center;background:#1a73e8;color:#fff;text-decoration:none;
+  padding:14px;border:0;border-radius:8px;margin-top:10px;font-size:16px;cursor:pointer}
+.sec{background:#e8eaed;color:#222}.usar{background:#188038}.dev{background:#e37400}
+button:disabled{opacity:.6}
+.ok,.err,.info{padding:12px;border-radius:8px;margin-bottom:12px}
+.ok{background:#e6f4ea;color:#137333}.err{background:#fce8e6;color:#a50e0e}.info{background:#e8f0fe;color:#174ea6}
+.herr,.adm{border-top:1px solid #eee;padding-top:12px;margin-top:12px}
+.estado{padding:12px;border-radius:8px;margin-bottom:12px;font-size:16px}
+.libre{background:#e6f4ea;color:#137333}.uso{background:#fef7e0;color:#8a5a00}.mant{background:#fce8e6;color:#a50e0e}
+label{display:block;color:#666;margin:10px 0 6px}
+select,input,textarea{width:100%;box-sizing:border-box;font-size:16px;padding:12px;border:1px solid #ccc;border-radius:8px;
+  background:#fff;font-family:inherit}
+.quien{color:#444;margin-bottom:4px}.nota{color:#666;font-size:14px;margin-top:8px}.oculto{display:none}
+</style>
+</head>
+<body>
+<div class="card" id="card"><div id="msg"><div class="info">Cargando…</div></div></div>
+<script>
+// URL /exec de la implementación única (DEPLOY.md). No cambia nunca.
+var API = "https://script.google.com/macros/s/AKfycbxx0Z46-Mh73unY2Hb9Qjk2jXFyvO68dG97eZskHm1CxAg2cQ6Y5OmS7vkm3y6iumgk/exec";
+var CLAVE_P = "inventario_persona", CLAVE_T = "inventario_token";
+var ID_ART = (new URLSearchParams(location.search).get("id") || "").trim();
+
+function ls(k, v) {
+  try {
+    if (v === undefined) return localStorage.getItem(k);
+    if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v);
+  } catch (e) { return null; }
+}
+function tarjeta() { return document.getElementById("card"); }
+function aviso(texto, clase) {
+  var m = document.getElementById("msg"); if (!m) return;
+  m.innerHTML = ""; var div = document.createElement("div");
+  div.className = clase; div.textContent = texto; m.appendChild(div);
+}
+function botones(activos) {
+  var bs = tarjeta().querySelectorAll("button");
+  for (var i = 0; i < bs.length; i++) bs[i].disabled = !activos;
+}
+function recordar() {
+  var s = document.getElementById("persona"), n = ls(CLAVE_P);
+  if (s && n) for (var i = 0; i < s.options.length; i++) if (s.options[i].value === n) s.value = n;
+}
+// Sin tarjeta (ID inexistente o falta el ID): título y mensaje solos.
+function soloMensaje(titulo) {
+  var c = tarjeta(); c.innerHTML = '<h1></h1><div id="msg"></div>';
+  c.querySelector("h1").textContent = titulo;
+}
+function pintar(res) {
+  if (res.titulo) document.title = res.titulo;
+  if (res.sesionVencida) ls(CLAVE_T, null);
+  if (res.token) ls(CLAVE_T, res.token);
+  if (res.html) tarjeta().innerHTML = res.html;
+  else if (res.titulo) soloMensaje(res.titulo);
+  else botones(true);
+  if (res.error) aviso(res.error, "err");
+  recordar();
+}
+// Texto plano = pedido "simple" (sin preflight CORS). credentials "omit" = sin cookies de Google (sin /u/N/).
+function llamar(fn, args, espera) {
+  botones(false);
+  if (espera) aviso(espera, "info");
+  fetch(API, { method: "POST", body: JSON.stringify({ fn: fn, args: args }), credentials: "omit", redirect: "follow" })
+    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(pintar)
+    .catch(function () {
+      botones(true);
+      if (!document.getElementById("msg")) soloMensaje("Inventario");
+      aviso("No se pudo conectar con el inventario. Revisá la señal y probá de nuevo.", "err");
+    });
+}
+function valor(id) { return document.getElementById(id).value; }
+function usar(accion) {
+  var s = document.getElementById("persona");
+  if (!s.value) { aviso("Elegí tu nombre primero.", "err"); return; }
+  ls(CLAVE_P, s.value);
+  llamar(accion === "empezar" ? "empezarUso" : "terminarUso", [ID_ART, s.value, ls(CLAVE_T)], "Guardando…");
+}
+function mostrar(id) { document.getElementById(id).className = ""; }
+function entrar() { llamar("entrarAdmin", [ID_ART, valor("adm-nombre"), valor("adm-pin")], "Verificando PIN…"); }
+function salir() { var t = ls(CLAVE_T); ls(CLAVE_T, null); llamar("salirAdmin", [ID_ART, t]); }
+function verificar() { llamar("verificarAdmin", [ID_ART, ls(CLAVE_T)], "Guardando…"); }
+function guardar() {
+  llamar("guardarCambios", [ID_ART, ls(CLAVE_T), {
+    disponibilidad: valor("e-disp"), desgaste: valor("e-desg"), ubicacion: valor("e-ubic"), notas: valor("e-notas")
+  }], "Guardando…");
+}
+
+if (ID_ART) llamar("escaneo", [ID_ART, ls(CLAVE_T)]);
+else { soloMensaje("Falta el ID"); aviso("El QR no tiene un ID de artículo.", "err"); }
+</script>
+</body>
+</html>
