@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Vista previa · Ficha de inventario</title>
+<style>
+  :root { --verde: #1F7A4D; --fondo: #EEF2EE; --tarjeta: #fff; --texto: #1B241D; --texto-2: #5B6B5F; --borde: #DDE5DE; }
+  @media (prefers-color-scheme: dark) { :root { --fondo: #0D1510; --tarjeta: #16231A; --texto: #E4EEE6; --texto-2: #9DB1A3; --borde: #2A3D30; } }
+  body { margin: 0; font-family: system-ui, sans-serif; background: var(--fondo); color: var(--texto); padding: 20px 16px; }
+  .caja { max-width: 520px; margin: auto; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  p { color: var(--texto-2); margin: 0 0 16px; line-height: 1.45; }
+  a.caso { display: block; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; color: var(--texto); text-decoration: none; }
+  a.caso b { display: block; margin-bottom: 3px; }
+  a.caso span { color: var(--texto-2); font-size: 14px; }
+  .aviso { background: #FBF1D6; color: #7A5D08; border-radius: 12px; padding: 12px 14px; font-size: 14px; margin-bottom: 16px; }
+  code { background: rgba(0,0,0,.07); padding: 1px 6px; border-radius: 6px; }
+</style>
+</head>
+<body>
+<div class="caja">
+  <h1>Vista previa de la ficha</h1>
+  <p>Demo con un <b>servidor simulado</b>: podés tocar todo, no se guarda nada en la planilla real.</p>
+  <div class="aviso">PIN de prueba de la administrativa <b>Ana</b>: <code>0123</code> (probá también uno incorrecto).</div>
+  <a class="caso" href="index.html?id=30"><b>🛠️ Herramienta (Bordeadora)</b><span>Elegí un nombre → Empezar a usar (check + contador) → Terminar y devolver (confeti).</span></a>
+  <a class="caso" href="index.html?id=01"><b>🪑 Silla + modo administrativo</b><span>Modo administrativo → PIN en ventana → Marcar como verificado (festejo grande).</span></a>
+  <a class="caso" href="index.html?id=01&amp;offline=1"><b>📡 Sin señal</b><span>Muestra la última ficha guardada (abrí antes la Silla para que haya una guardada).</span></a>
+  <a class="caso" href="index.html?id=99"><b>🔍 QR de un artículo que no existe</b><span>Mensaje de "no encontrado".</span></a>
+  <p>Probá el botón ☀️/🌙 arriba a la derecha para el cambio de tema animado.</p>
+</div>
+</body>
+</html>
