@@ -7,13 +7,16 @@
 <meta name="theme-color" content="#26532B">
 <title>Inventario · Olivos Patagónicos</title>
 <link rel="icon" type="image/png" href="img/isur_logo_claro.png">
+<link rel="preload" href="fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
 <!--
   Ficha del inventario fuera de Google (GitHub Pages). El QR apunta acá: ?id=05
   Los datos los da el Apps Script (Api.gs) por fetch SIN cookies de Google (credentials: 'omit'),
   así no hay redirección a /macros/u/N/ cuando el celular tiene varias cuentas de Google.
   La tarjeta la arma el servidor (Ficha.gs) con las mismas clases que la ficha original; acá se muestra
-  y se "decora" (decorar()): ícono por categoría, etiqueta de disponibilidad, estrellas y "hace N días".
-  Tema claro/oscuro: botón en el encabezado, se guarda en el celular; la primera vez sigue al teléfono.
+  y se "decora" (decorar()): íconos, etiqueta de disponibilidad, estrellas, contador de uso, PIN en ventana.
+  Animaciones: CSS/Web Animations nativas + canvas-confetti (js/, se carga solo al festejar). Todo respeta
+  prefers-reduced-motion. Recursos de terceros (todos gratuitos, uso comercial permitido):
+  Lucide (ISC), canvas-confetti (ISC), Figtree (SIL OFL 1.1, fonts/OFL.txt). Investigación: docs/DISENO_ANIMACIONES.md
   Colores de marca iSUR (Sensores Draginos/06_Marca/paleta_grafana.md).
 -->
 <script>
@@ -26,6 +29,11 @@
 })();
 </script>
 <style>
+@font-face {
+  font-family: "Figtree"; font-style: normal; font-weight: 400 800; font-display: swap;
+  src: url(fonts/figtree-latin.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 :root {
   --marca: #26532B;        /* Dark Spruce: encabezado */
   --marca-2: #1F7A4D;      /* verde profundo: botones principales */
@@ -39,15 +47,18 @@
   --texto: #1B241D;
   --texto-2: #5B6B5F;
   --borde: #DDE5DE;
+  --icono: #1F7A4D;
   --sombra: 0 10px 30px rgba(38, 83, 43, .10), 0 2px 6px rgba(0, 0, 0, .05);
   --ok-fondo: #E4F3E8; --ok-texto: #1E6B3A;
   --err-fondo: #FBE7E4; --err-texto: #9B2A1F;
   --info-fondo: #E6EEF7; --info-texto: #24548A;
   --aten-fondo: #FBF1D6; --aten-texto: #7A5D08;
   --btn-dev: #8C6D0F;
-  --estrella: #C99A06;
-  --estrella-vacia: #CFD6D0;
+  --estrella: #9C7600;
+  --estrella-vacia: #98A49B;
+  --borde-campo: #7D8E81;
   --brillo: rgba(255, 255, 255, .6);
+  --telon: rgba(13, 21, 16, .45);
   color-scheme: light;
 }
 [data-theme="dark"] {
@@ -57,34 +68,40 @@
   --texto: #E4EEE6;
   --texto-2: #9DB1A3;
   --borde: #2A3D30;
+  --icono: #7BD497;
   --sombra: 0 10px 30px rgba(0, 0, 0, .45);
   --ok-fondo: #173524; --ok-texto: #8FDCA8;
   --err-fondo: #3A1C18; --err-texto: #F3A79C;
   --info-fondo: #182A3D; --info-texto: #9CC3EC;
   --aten-fondo: #352B10; --aten-texto: #E8C766;
-  --btn-dev: #A07C12;
+  --btn-dev: #86680E;
   --estrella: #E8B923;
-  --estrella-vacia: #3A4A3F;
+  --estrella-vacia: #5E7466;
+  --borde-campo: #6A8173;
   --brillo: rgba(255, 255, 255, .06);
+  --telon: rgba(0, 0, 0, .6);
   color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; }
 body {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   background: var(--fondo); color: var(--texto); min-height: 100vh;
   display: flex; flex-direction: column; -webkit-font-smoothing: antialiased;
 }
 /* Respaldo sin View Transitions: fundido de colores */
 html.fundido, html.fundido * { transition: background-color .4s ease, color .4s ease, border-color .4s ease !important; }
 
+/* Íconos (Lucide, SVG en línea) */
+.ic { width: 1em; height: 1em; display: inline-block; vertical-align: -.14em; flex: none; }
+
 /* ===== Encabezado ===== */
 header {
   background: linear-gradient(135deg, #26532B 0%, #1F6B3C 60%, #2E8A4E 100%);
   color: #fff; padding: calc(14px + env(safe-area-inset-top)) 16px 46px; position: relative; overflow: hidden;
 }
-header::after { /* hojas decorativas */
+header::after { /* aro decorativo */
   content: ""; position: absolute; right: -40px; top: -50px; width: 180px; height: 180px; border-radius: 50%;
   border: 26px solid rgba(255, 255, 255, .07);
 }
@@ -94,16 +111,16 @@ header::after { /* hojas decorativas */
   display: grid; place-items: center; font-size: 22px; flex: none;
 }
 .marca-txt { flex: 1; min-width: 0; }
-.marca-txt b { display: block; font-size: 17px; letter-spacing: .2px; }
-.marca-txt span { display: block; font-size: 13px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.marca-txt b { display: block; font-size: 17px; font-weight: 700; letter-spacing: .2px; }
+.marca-txt span { display: block; font-size: 13px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .tema {
   width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .25);
   background: rgba(255, 255, 255, .12); color: #fff; cursor: pointer; position: relative; flex: none;
-  display: grid; place-items: center; -webkit-tap-highlight-color: transparent;
+  display: grid; place-items: center; -webkit-tap-highlight-color: transparent; font-size: 22px;
 }
 .tema:active { transform: scale(.92); }
-.tema svg { width: 22px; height: 22px; position: absolute; transition: transform .5s cubic-bezier(.5, -.4, .3, 1.4), opacity .3s; }
+.tema .ic { position: absolute; transition: transform .5s cubic-bezier(.5, -.4, .3, 1.4), opacity .3s; }
 .tema .sol { opacity: 1; transform: rotate(0) scale(1); }
 .tema .luna { opacity: 0; transform: rotate(-90deg) scale(.4); }
 [data-theme="dark"] .tema .sol { opacity: 0; transform: rotate(90deg) scale(.4); }
@@ -115,13 +132,11 @@ main { flex: 1; padding: 0 14px; margin-top: -32px; position: relative; z-index:
   background: var(--superficie); border-radius: 18px; padding: 20px; max-width: 520px; margin: auto;
   box-shadow: var(--sombra); border: 1px solid var(--borde);
 }
-.aparecer { animation: aparecer .45s cubic-bezier(.2, .8, .2, 1); }
-@keyframes aparecer { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
 
-/* Esqueleto mientras carga */
+/* Esqueleto mientras carga (el brillo se mueve con transform: no repinta) */
 .esq { border-radius: 10px; background: var(--superficie-2); position: relative; overflow: hidden; margin-bottom: 12px; }
 .esq::after {
-  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; transform: translateX(-100%);
   background: linear-gradient(90deg, transparent, var(--brillo), transparent); animation: brillo 1.3s infinite;
 }
 @keyframes brillo { to { transform: translateX(100%); } }
@@ -129,24 +144,27 @@ main { flex: 1; padding: 0 14px; margin-top: -32px; position: relative; z-index:
 /* Cabecera del artículo (la arma decorar()) */
 .hero { display: flex; gap: 14px; align-items: center; margin-bottom: 16px; }
 .icono {
-  width: 64px; height: 64px; border-radius: 18px; flex: none; display: grid; place-items: center; font-size: 34px;
-  background: linear-gradient(145deg, var(--ok-fondo), var(--superficie-2)); border: 1px solid var(--borde);
+  width: 64px; height: 64px; border-radius: 18px; flex: none; display: grid; place-items: center; font-size: 32px;
+  background: linear-gradient(145deg, var(--ok-fondo), var(--superficie-2)); border: 1px solid var(--borde); color: var(--icono);
 }
 .hero-txt { min-width: 0; }
 .meta { color: var(--texto-2); font-size: 13px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.pill-id { background: var(--superficie-2); border: 1px solid var(--borde); border-radius: 999px; padding: 2px 9px; font-weight: 600; font-variant-numeric: tabular-nums; }
-h1 { font-size: 22px; line-height: 1.2; margin: 4px 0 0; }
-h2 { font-size: 16px; margin: 20px 0 4px; }
+.pill-id { background: var(--superficie-2); border: 1px solid var(--borde); border-radius: 999px; padding: 2px 9px; font-weight: 700; font-variant-numeric: tabular-nums; }
+h1 { font-size: 23px; line-height: 1.2; margin: 4px 0 0; font-weight: 800; letter-spacing: -.2px; }
+h2 { font-size: 16px; margin: 20px 0 4px; font-weight: 700; }
 .id { color: var(--texto-2); font-size: 14px; }
-.chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
-.chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 14px; font-weight: 600; }
+.chips { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.chip { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px; font-size: 14px; font-weight: 700; }
 .chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .chip-ok { background: var(--ok-fondo); color: var(--ok-texto); }
 .chip-uso { background: var(--info-fondo); color: var(--info-texto); }
+.chip-uso::before { animation: latido 1.8s ease-out 5; }
+@keyframes latido { 0% { box-shadow: 0 0 0 0 currentColor; } 70%, 100% { box-shadow: 0 0 0 7px transparent; } }
 .chip-mant { background: var(--aten-fondo); color: var(--aten-texto); }
 .chip-crit { background: var(--err-fondo); color: var(--err-texto); }
 .chip-neutro { background: var(--superficie-2); color: var(--texto-2); }
 .estrellas { font-size: 18px; letter-spacing: 1px; white-space: nowrap; }
+.estrellas span { display: inline-block; }
 .estrellas .llena { color: var(--estrella); }
 .estrellas .vacia { color: var(--estrella-vacia); }
 
@@ -156,18 +174,20 @@ tr.oculta { display: none; }
 th { text-align: left; color: var(--texto-2); font-weight: 500; padding: 11px 8px 11px 0; width: 42%; vertical-align: top; font-size: 14px; }
 td { padding: 11px 0; border-bottom: 1px solid var(--borde); }
 tr:last-child td { border-bottom: 0; }
-th .ico { display: inline-block; width: 22px; }
+th .ic { color: var(--icono); margin-right: 6px; font-size: 16px; }
 .rel { display: block; color: var(--texto-2); font-size: 13px; margin-top: 2px; }
 
 /* Botones */
 .btn {
-  display: block; width: 100%; text-align: center; background: var(--marca-2); color: #fff; text-decoration: none;
-  padding: 15px; border: 0; border-radius: 12px; margin-top: 10px; font-size: 16px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; text-align: center;
+  background: var(--marca-2); color: #fff; text-decoration: none;
+  padding: 15px; border: 0; border-radius: 12px; margin-top: 10px; font-size: 16px; font-weight: 700; cursor: pointer;
   font-family: inherit; box-shadow: 0 2px 0 rgba(0, 0, 0, .12); transition: transform .12s, filter .2s;
   -webkit-tap-highlight-color: transparent;
 }
-.btn:active { transform: scale(.98); filter: brightness(.95); }
+.btn:active { transform: scale(.97); filter: brightness(.94); }
 .sec { background: var(--superficie-2); color: var(--texto); border: 1px solid var(--borde); box-shadow: none; }
+.sec .ic { color: var(--icono); }
 .usar { background: var(--marca-2); }
 .dev { background: var(--btn-dev); }
 button:disabled { opacity: .55; cursor: wait; }
@@ -175,30 +195,86 @@ a { color: var(--azul); }
 [data-theme="dark"] a { color: #8DB8E6; }
 
 /* Mensajes y estados */
-.ok, .err, .info { padding: 12px 14px; border-radius: 12px; margin-bottom: 12px; font-size: 15px; animation: aparecer .3s ease; }
+.ok, .err, .info { padding: 12px 14px; border-radius: 12px; margin-bottom: 12px; font-size: 15px; display: flex; gap: 8px; align-items: flex-start; }
+.ok .ic, .err .ic, .info .ic { margin-top: .12em; }
 .ok { background: var(--ok-fondo); color: var(--ok-texto); }
 .err { background: var(--err-fondo); color: var(--err-texto); }
 .info { background: var(--info-fondo); color: var(--info-texto); }
 .herr, .adm { border-top: 1px solid var(--borde); padding-top: 14px; margin-top: 14px; }
-.estado { padding: 13px 14px; border-radius: 12px; margin-bottom: 12px; font-size: 16px; }
+.estado { padding: 13px 14px; border-radius: 12px; margin-bottom: 12px; font-size: 16px; display: flex; gap: 9px; align-items: flex-start; flex-wrap: wrap; }
+.estado > .ic { margin-top: .15em; font-size: 18px; }
 .libre { background: var(--ok-fondo); color: var(--ok-texto); }
 .uso { background: var(--aten-fondo); color: var(--aten-texto); }
 .mant { background: var(--err-fondo); color: var(--err-texto); }
+.estado > span, .ok > span, .err > span, .info > span, .quien > span { flex: 1; min-width: 0; }
+.contador { flex-basis: 100%; display: flex; align-items: baseline; gap: 8px; margin-top: 6px; font-size: 13px; }
+.contador b { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .5px; }
 
 /* Formularios */
 label { display: block; color: var(--texto-2); margin: 12px 0 6px; font-size: 14px; }
 select, input, textarea {
-  width: 100%; font-size: 16px; padding: 12px; border: 1px solid var(--borde); border-radius: 10px;
+  width: 100%; font-size: 16px; padding: 12px; border: 1px solid var(--borde-campo); border-radius: 10px;
   background: var(--superficie-2); color: var(--texto); font-family: inherit;
 }
 select:focus, input:focus, textarea:focus { outline: 2px solid var(--verde); outline-offset: 1px; }
-.quien { color: var(--texto-2); margin-bottom: 4px; }
+.quien { color: var(--texto-2); margin-bottom: 4px; display: flex; gap: 6px; align-items: center; }
 .nota { color: var(--texto-2); font-size: 14px; margin-top: 8px; }
 .oculto { display: none; }
 
+/* Sin señal */
+.franja {
+  display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; margin-bottom: 14px;
+  background: var(--aten-fondo); color: var(--aten-texto); font-size: 14px;
+}
+.franja .ic { font-size: 20px; }
+.franja > div { flex: 1; min-width: 0; }
+.reintentar {
+  margin-top: 8px; padding: 8px 14px; border-radius: 10px; border: 1px solid currentColor; background: transparent;
+  color: inherit; font: inherit; font-weight: 700; cursor: pointer;
+}
+.congelada a, .congelada select, .congelada input, .congelada textarea { pointer-events: none; opacity: .6; }
+.sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
 /* Mensaje sin tarjeta (no encontrado, sin conexión) */
 .vacio { text-align: center; padding: 10px 0 4px; }
-.vacio .grande { font-size: 52px; margin-bottom: 6px; }
+.vacio .grande {
+  width: 84px; height: 84px; margin: 0 auto 10px; border-radius: 26px; display: grid; place-items: center; font-size: 42px;
+  background: var(--superficie-2); color: var(--icono); border: 1px solid var(--borde);
+}
+
+/* ===== PIN en ventana que sube desde abajo ===== */
+dialog.hoja {
+  margin: auto auto 0; width: 100%; max-width: 520px; max-height: 90vh; border: 0; border-radius: 22px 22px 0 0;
+  padding: 10px 20px calc(22px + env(safe-area-inset-bottom)); background: var(--superficie); color: var(--texto);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, .25); transform: translateY(0); opacity: 1;
+  transition: transform .34s cubic-bezier(.2, .8, .2, 1), opacity .2s, overlay .34s allow-discrete, display .34s allow-discrete;
+}
+dialog.hoja:not([open]) { transform: translateY(100%); opacity: 0; }
+@starting-style { dialog.hoja[open] { transform: translateY(100%); opacity: 0; } }
+dialog.hoja::backdrop { background: rgba(13, 21, 16, .45); background: var(--telon, rgba(13, 21, 16, .45)); transition: background-color .3s, overlay .3s allow-discrete, display .3s allow-discrete; }
+[data-theme="dark"] dialog.hoja::backdrop { background: rgba(0, 0, 0, .6); background: var(--telon, rgba(0, 0, 0, .6)); }
+@starting-style { dialog.hoja[open]::backdrop { background: transparent; } }
+.asa { width: 42px; height: 5px; border-radius: 3px; background: var(--borde); margin: 2px auto 12px; }
+.hoja-cab { display: flex; align-items: center; gap: 12px; }
+.hoja-cab h2 { margin: 0; flex: 1; font-size: 19px; }
+.candado {
+  width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; font-size: 24px;
+  background: var(--ok-fondo); color: var(--icono); flex: none;
+}
+.cerrar {
+  width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--borde); background: var(--superficie-2);
+  color: var(--texto-2); font-size: 22px; line-height: 1; cursor: pointer; flex: none;
+}
+#dlg-msg:empty { display: none; }
+#dlg-msg { margin-top: 12px; }
+
+/* ===== Festejo (verificado / devuelta / empezó a usar) ===== */
+.festejo { position: fixed; top: 0; right: 0; bottom: 0; left: 0; display: grid; place-items: center; pointer-events: none; z-index: 50; }
+.sello {
+  width: 124px; height: 124px; border-radius: 50%; background: var(--marca-2); display: grid; place-items: center;
+  box-shadow: 0 0 0 10px rgba(57, 158, 90, .18), 0 16px 40px rgba(31, 122, 77, .45);
+}
+.sello svg { width: 66px; height: 66px; fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; }
 
 /* ===== Pie ===== */
 footer { text-align: center; padding: 26px 16px calc(22px + env(safe-area-inset-bottom)); color: var(--texto-2); font-size: 12px; }
@@ -207,8 +283,10 @@ footer img { height: 84px; display: block; margin: 0 auto 8px; }
 [data-theme="dark"] .logo-claro { display: none !important; }
 [data-theme="dark"] .logo-oscuro { display: block !important; }
 
-/* Animación del cambio de tema: el tema nuevo crece en círculo desde el botón */
-::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+/* View Transitions: el cambio de tema crece en círculo desde el botón (solo con html.vt-tema);
+   en las acciones, la etiqueta de estado se transforma de un valor al otro. */
+html.vt-tema::view-transition-old(root), html.vt-tema::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-group(*) { animation-duration: .3s; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -218,19 +296,12 @@ footer img { height: 84px; display: block; margin: 0 auto 8px; }
 <body>
 <header>
   <div class="barra">
-    <div class="marca-ico" aria-hidden="true">🫒</div>
+    <div class="marca-ico" id="marca-ico" aria-hidden="true"></div>
     <div class="marca-txt">
       <b id="marca-nombre">Olivos Patagónicos</b>
       <span id="marca-sitio">Inventario · Polo Olivícola Dolavon</span>
     </div>
-    <button class="tema" id="tema" type="button" aria-label="Cambiar entre modo claro y oscuro" onclick="cambiarTema(event)">
-      <svg class="sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
-      </svg>
-      <svg class="luna" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a.6.6 0 0 0-.8-.7A9.5 9.5 0 1 0 21.2 15.4a.6.6 0 0 0-.7-.8Z"/>
-      </svg>
-    </button>
+    <button class="tema" id="tema" type="button" aria-label="Cambiar entre modo claro y oscuro" onclick="cambiarTema()"></button>
   </div>
 </header>
 
@@ -244,6 +315,8 @@ footer img { height: 84px; display: block; margin: 0 auto 8px; }
   </div>
 </main>
 
+<div id="anuncio" class="sr" role="status" aria-live="polite"></div>
+
 <footer>
   <img class="logo-claro" src="img/isur_logo_claro.png" alt="iSUR">
   <img class="logo-oscuro" src="img/isur_logo_oscuro.png" alt="iSUR">
@@ -251,11 +324,62 @@ footer img { height: 84px; display: block; margin: 0 auto 8px; }
 </footer>
 
 <script>
+// Íconos Lucide (ISC License, Copyright (c) Lucide Icons and Contributors; algunos derivados de Feather, MIT). https://lucide.dev
+var ICONOS_SVG = {
+  "armchair": '<path d="M19 9V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v3" /><path d="M3 16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v1.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5V11a2 2 0 0 0-4 0z" /><path d="M5 18v2" /><path d="M19 18v2" />',
+  "monitor": '<rect width="20" height="14" x="2" y="3" rx="2" /><line x1="8" x2="16" y1="21" y2="21" /><line x1="12" x2="12" y1="17" y2="21" />',
+  "zap": '<path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z" />',
+  "door-open": '<path d="M10 21H2" /><path d="M10 3H7a2 2 0 00-2 2v16" /><path d="M14 12h.01" /><path d="M19 21V5a2 2 0 00-1.675-1.974l-6.163-1.013A1 1 0 0010 3v18a1 1 0 001.124.992z" /><path d="M22 21h-3" />',
+  "wrench": '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" />',
+  "shower-head": '<path d="m4 4 2.5 2.5" /><path d="M13.5 6.5a4.95 4.95 0 0 0-7 7" /><path d="M15 5 5 15" /><path d="M14 17v.01" /><path d="M10 16v.01" /><path d="M13 13v.01" /><path d="M16 10v.01" /><path d="M11 20v.01" /><path d="M17 14v.01" /><path d="M20 11v.01" />',
+  "snowflake": '<path d="m10 20-1.25-2.5L6 18" /><path d="M10 4 8.75 6.5 6 6" /><path d="m14 20 1.25-2.5L18 18" /><path d="m14 4 1.25 2.5L18 6" /><path d="m17 21-3-6h-4" /><path d="m17 3-3 6 1.5 3" /><path d="M2 12h6.5L10 9" /><path d="m20 10-1.5 2 1.5 2" /><path d="M22 12h-6.5L14 15" /><path d="m4 10 1.5 2L4 14" /><path d="m7 21 3-6-1.5-3" /><path d="m7 3 3 6h4" />',
+  "brick-wall": '<rect width="18" height="18" x="3" y="3" rx="2" /><path d="M12 9v6" /><path d="M16 15v6" /><path d="M16 3v6" /><path d="M3 15h18" /><path d="M3 9h18" /><path d="M8 15v6" /><path d="M8 3v6" />',
+  "package": '<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z" /><path d="M12 22V12" /><polyline points="3.29 7 12 12 20.71 7" /><path d="m7.5 4.27 9 5.15" />',
+  "map-pin": '<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" />',
+  "calendar-check": '<path d="M8 2v3" /><path d="M16 2v3" /><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="m9 15 2 2 4-4" />',
+  "notebook-pen": '<path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4" /><path d="M2 6h4" /><path d="M2 10h4" /><path d="M2 14h4" /><path d="M2 18h4" /><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z" />',
+  "search-x": '<path d="m13.5 8.5-5 5" /><path d="m8.5 8.5 5 5" /><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />',
+  "wifi-off": '<path d="M12 20h.01" /><path d="M8.5 16.429a5 5 0 0 1 7 0" /><path d="M5 12.859a10 10 0 0 1 5.17-2.69" /><path d="M19 12.859a10 10 0 0 0-2.007-1.523" /><path d="M2 8.82a15 15 0 0 1 4.177-2.643" /><path d="M22 8.82a15 15 0 0 0-11.288-3.764" /><path d="m2 2 20 20" />',
+  "tag": '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" /><circle cx="7.5" cy="7.5" r=".5" fill="currentColor" />',
+  "lock": '<rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />',
+  "lock-open": '<rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" />',
+  "leaf": '<path d="M11 20a10 10 0 0010-10 25.9 25.9 0 00-1.04-7.281 1 1 0 00-1.755-.325C15.833 5.5 13 5.5 9.8 6.1A7 7 0 0011 20" /><path d="M2 21a5 5 0 012.911-4.544C7.613 15.212 8.351 15.24 11 13" />',
+  "sun": '<circle cx="12" cy="12" r="4" /><path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" />',
+  "moon": '<path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" />',
+  "timer": '<line x1="10" x2="14" y1="2" y2="2" /><line x1="12" x2="15" y1="14" y2="11" /><circle cx="12" cy="14" r="8" />',
+  "check": '<path d="M20 6 9 17l-5-5" />',
+  "circle-check": '<circle cx="12" cy="12" r="10" /><path d="m16 9-5.5 5.5L8 12" />',
+  "user-round": '<circle cx="12" cy="8" r="5" /><path d="M20 21a8 8 0 0 0-16 0" />'
+};
+
 // URL /exec de la implementación única (DEPLOY.md). No cambia nunca.
 var API = "https://script.google.com/macros/s/AKfycbxx0Z46-Mh73unY2Hb9Qjk2jXFyvO68dG97eZskHm1CxAg2cQ6Y5OmS7vkm3y6iumgk/exec";
 var CLAVE_P = "inventario_persona", CLAVE_T = "inventario_token", CLAVE_TEMA = "inventario_tema";
-var ID_ART = (new URLSearchParams(location.search).get("id") || "").trim();
-var SIN_ANIMACION = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+var CLAVE_ADMIN = "inventario_admin", CLAVE_FICHA = "inventario_ficha_";
+var ID_ART = (function () {
+  var m = /[?&]id=([^&#]*)/.exec(location.search);
+  try { return m ? decodeURIComponent(m[1].replace(/\+/g, " ")).trim() : ""; } catch (e) { return ""; }
+})();
+// Navegadores muy viejos (sin fetch o Promise): la ficha clásica de Apps Script, que funciona sin JS moderno.
+if (ID_ART && !(window.fetch && window.Promise)) location.replace(API + "?id=" + encodeURIComponent(ID_ART));
+var COLORES_MARCA = ["#26532B", "#399E5A", "#1F7A4D", "#3E78B2", "#B08E1E"];
+
+// Movimiento reducido: CSS lo respeta solo; las animaciones por JS consultan esta variable.
+var mqMovimiento = window.matchMedia ? matchMedia("(prefers-reduced-motion: reduce)") : null;
+var SIN_ANIMACION = !!(mqMovimiento && mqMovimiento.matches);
+if (mqMovimiento) {
+  var alCambiarMovimiento = function (e) { SIN_ANIMACION = e.matches; };
+  if (mqMovimiento.addEventListener) mqMovimiento.addEventListener("change", alCambiarMovimiento);
+  else if (mqMovimiento.addListener) mqMovimiento.addListener(alCambiarMovimiento);
+}
+var PUEDE_ANIMAR = typeof Element !== "undefined" && typeof Element.prototype.animate === "function";
+var RESORTE = (window.CSS && CSS.supports && CSS.supports("animation-timing-function", "linear(0, 1)"))
+  ? "linear(0, .22 6%, .6 13%, .94 21%, 1.1 29%, 1.13 34%, 1.1 40%, 1.02 52%, .98 62%, 1 78%, 1)"
+  : "cubic-bezier(.34, 1.56, .64, 1)";
+function animar(el, frames, opciones) {
+  if (!el || SIN_ANIMACION || !PUEDE_ANIMAR) return null;
+  try { return el.animate(frames, opciones); } catch (e) { return null; }
+}
 
 function ls(k, v) {
   try {
@@ -263,6 +387,12 @@ function ls(k, v) {
     if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v);
   } catch (e) { return null; }
 }
+function svg(nombre, clase) {
+  return '<svg class="ic ' + (clase || "") + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" ' +
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONOS_SVG[nombre] || ICONOS_SVG["package"]) + "</svg>";
+}
+document.getElementById("marca-ico").innerHTML = svg("leaf");
+document.getElementById("tema").innerHTML = svg("sun", "sol") + svg("moon", "luna");
 
 // ===== Tema claro / oscuro =====
 function aplicarTema(t) {
@@ -270,12 +400,12 @@ function aplicarTema(t) {
   var meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", t === "dark" ? "#0D1510" : "#26532B");
 }
-function cambiarTema(ev) {
-  var nuevo = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+function cambiarTema() {
+  var html = document.documentElement;
+  var nuevo = html.getAttribute("data-theme") === "dark" ? "light" : "dark";
   ls(CLAVE_TEMA, nuevo);
   if (SIN_ANIMACION) { aplicarTema(nuevo); return; }
   if (!document.startViewTransition) { // navegadores viejos: fundido de colores
-    var html = document.documentElement;
     html.classList.add("fundido"); aplicarTema(nuevo);
     setTimeout(function () { html.classList.remove("fundido"); }, 450);
     return;
@@ -283,12 +413,14 @@ function cambiarTema(ev) {
   var b = document.getElementById("tema").getBoundingClientRect();
   var x = b.left + b.width / 2, y = b.top + b.height / 2;
   var radio = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+  html.classList.add("vt-tema");
   var tr = document.startViewTransition(function () { aplicarTema(nuevo); });
   tr.ready.then(function () {
-    document.documentElement.animate(
+    html.animate(
       { clipPath: ["circle(0px at " + x + "px " + y + "px)", "circle(" + radio + "px at " + x + "px " + y + "px)"] },
       { duration: 650, easing: "cubic-bezier(.4, 0, .2, 1)", pseudoElement: "::view-transition-new(root)" });
-  });
+  }).catch(function () {});
+  tr.finished.then(function () { html.classList.remove("vt-tema"); }, function () { html.classList.remove("vt-tema"); });
 }
 
 // ===== Tarjeta =====
@@ -297,6 +429,7 @@ function aviso(texto, clase) {
   var m = document.getElementById("msg"); if (!m) return;
   m.innerHTML = ""; var div = document.createElement("div");
   div.className = clase; div.textContent = texto; m.appendChild(div);
+  animar(div, [{ opacity: 0, transform: "translateY(-6px)" }, { opacity: 1, transform: "none" }], { duration: 250, easing: "ease-out" });
 }
 function botones(activos) {
   var bs = tarjeta().querySelectorAll("button");
@@ -306,25 +439,21 @@ function recordar() {
   var s = document.getElementById("persona"), n = ls(CLAVE_P);
   if (s && n) for (var i = 0; i < s.options.length; i++) if (s.options[i].value === n) s.value = n;
 }
-function animar() {
-  var c = tarjeta(); c.classList.remove("aparecer"); void c.offsetWidth; c.classList.add("aparecer");
-}
 // Sin tarjeta (ID inexistente, falta el ID, sin conexión): ícono, título y mensaje.
 function soloMensaje(titulo, icono) {
   var c = tarjeta();
-  c.innerHTML = '<div class="vacio"><div class="grande" aria-hidden="true"></div><h1></h1></div><div id="msg"></div>';
-  c.querySelector(".grande").textContent = icono || "📦";
+  c.innerHTML = '<div class="vacio"><div class="grande">' + svg(icono || "package") + '</div><h1></h1></div><div id="msg" role="status"></div>';
   c.querySelector("h1").textContent = titulo;
-  animar();
+  animar(c.querySelector(".grande"), [{ opacity: 0, transform: "scale(.6)" }, { opacity: 1, transform: "none" }], { duration: 500, easing: RESORTE });
 }
 
 function sinAcentos(s) { return String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim(); }
-var ICONOS = [[/mueble/, "🪑"], [/tecnolog/, "💻"], [/electric/, "⚡"], [/abertura/, "🚪"], [/herramienta/, "🛠️"],
-  [/sanitari/, "🚿"], [/climatiz/, "❄️"], [/material/, "🧱"]];
+var CATEGORIAS = [[/mueble/, "armchair"], [/tecnolog/, "monitor"], [/electric/, "zap"], [/abertura/, "door-open"],
+  [/herramienta/, "wrench"], [/sanitari/, "shower-head"], [/climatiz/, "snowflake"], [/material/, "brick-wall"]];
 function iconoCategoria(cat) {
   var k = sinAcentos(cat);
-  for (var i = 0; i < ICONOS.length; i++) if (ICONOS[i][0].test(k)) return ICONOS[i][1];
-  return "📦";
+  for (var i = 0; i < CATEGORIAS.length; i++) if (CATEGORIAS[i][0].test(k)) return CATEGORIAS[i][1];
+  return "package";
 }
 function claseDisponibilidad(v) {
   var k = sinAcentos(v);
@@ -348,14 +477,77 @@ function hace(texto) { // "2025-04-04" → "hace 1 año"
   var anios = Math.floor(meses / 12);
   return "hace " + anios + (anios === 1 ? " año" : " años");
 }
+function haceRato(ms) { // milisegundos → "hace 5 min"
+  var min = Math.round(ms / 60000);
+  if (min < 1) return "recién";
+  if (min < 60) return "hace " + min + " min";
+  var h = Math.round(min / 60);
+  if (h < 48) return "hace " + h + " h";
+  return "hace " + Math.round(h / 24) + " días";
+}
 function fechaLinda(texto) {
   var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(texto).trim());
   return m ? m[3] + "/" + m[2] + "/" + m[1] : texto;
 }
 
+// Emojis que manda el servidor al principio de un texto → íconos Lucide (mismo estilo en toda la ficha).
+var EMOJI_ICONO = { "🔧": "timer", "✅": "circle-check", "⚠": "wrench", "🔒": "lock", "👤": "user-round" };
+var RE_EMOJI = null;
+try { RE_EMOJI = new RegExp("^\\s*(\\p{Extended_Pictographic})\\uFE0F?\\s*", "u"); } catch (e) {}
+function emojiAIcono(el) {
+  if (!el || !RE_EMOJI) return;
+  var n = el.firstChild;
+  while (n && n.nodeType === 3 && !n.nodeValue.trim()) n = n.nextSibling;
+  if (!n || n.nodeType !== 3) return;
+  var m = RE_EMOJI.exec(n.nodeValue);
+  if (!m || !EMOJI_ICONO[m[1]]) return;
+  n.nodeValue = n.nodeValue.slice(m[0].length);
+  var t = document.createElement("template"); t.innerHTML = svg(EMOJI_ICONO[m[1]]);
+  el.insertBefore(t.content.firstChild, n);
+  // El resto del texto (con sus <b>, <a>) va junto en un span: el contenedor es flex y si no se parte en pedazos.
+  var span = document.createElement("span");
+  while (n) { var sig = n.nextSibling; span.appendChild(n); n = sig; }
+  el.appendChild(span);
+}
+
+// Contador de uso de una herramienta ("En uso por Juan desde hoy a las 14:00").
+var relojUso = null;
+function inicioDeUso(texto) {
+  var m = /desde (hoy|el (\d{1,2})\/(\d{1,2})) a las (\d{1,2}):(\d{2})/.exec(texto);
+  if (!m) return null;
+  var f = new Date();
+  if (m[2]) { f.setMonth(+m[3] - 1, +m[2]); if (f > new Date()) f.setFullYear(f.getFullYear() - 1); }
+  f.setHours(+m[4], +m[5], 0, 0);
+  return f;
+}
+function dosDigitos(n) { return (n < 10 ? "0" : "") + n; }
+function contadorUso(bloque) {
+  var inicio = inicioDeUso(bloque.textContent);
+  if (!inicio || modoSinSenal) return;
+  var transcurrido = Date.now() - inicio;
+  if (transcurrido < -5 * 60000 || transcurrido > 7 * 86400000) return; // reloj desfasado o uso de hace días
+  var c = document.createElement("div"); c.className = "contador";
+  c.innerHTML = '<span>Tiempo de uso</span><b aria-live="off"></b>';
+  bloque.appendChild(c);
+  var b = c.querySelector("b");
+  function tic() {
+    var s = Math.max(0, Math.floor((Date.now() - inicio) / 1000));
+    b.textContent = Math.floor(s / 3600) + ":" + dosDigitos(Math.floor(s / 60) % 60) + ":" + dosDigitos(s % 60);
+  }
+  tic(); relojUso = setInterval(tic, 1000);
+}
+
 // Convierte la tabla que manda el servidor en una ficha más visual. Si la estructura no es la esperada, no toca nada.
 function decorar() {
-  var c = tarjeta(), h1 = c.querySelector("h1"), idEl = c.querySelector(".id");
+  var c = tarjeta();
+  if (relojUso) { clearInterval(relojUso); relojUso = null; }
+  var msg = document.getElementById("msg");
+  if (msg) msg.setAttribute("role", "status");
+  Array.prototype.forEach.call(c.querySelectorAll("#msg .ok, .estado, .quien, .adm > .btn.sec"), emojiAIcono);
+  var uso = c.querySelector(".estado.uso");
+  if (uso) contadorUso(uso);
+
+  var h1 = c.querySelector("h1"), idEl = c.querySelector(".id");
   if (!h1 || !c.querySelector("table")) return;
   var filas = {};
   var trs = c.querySelectorAll("table tr");
@@ -365,11 +557,10 @@ function decorar() {
   }
   function valor(k) { var f = filas[k]; var v = f ? f.td.textContent.trim() : ""; return v === "—" ? "" : v; }
 
-  // Cabecera: ícono, categoría · ID, nombre
+  // Cabecera: ícono, ID · categoría, nombre
   var cat = valor("categoria");
   var hero = document.createElement("div"); hero.className = "hero";
-  var ico = document.createElement("div"); ico.className = "icono"; ico.setAttribute("aria-hidden", "true");
-  ico.textContent = iconoCategoria(cat);
+  var ico = document.createElement("div"); ico.className = "icono"; ico.innerHTML = svg(iconoCategoria(cat));
   var txt = document.createElement("div"); txt.className = "hero-txt";
   var meta = document.createElement("div"); meta.className = "meta";
   var pid = document.createElement("span"); pid.className = "pill-id";
@@ -385,14 +576,17 @@ function decorar() {
   var disp = valor("disponibilidad");
   if (disp) {
     var ch = document.createElement("span"); ch.className = "chip " + claseDisponibilidad(disp); ch.textContent = disp;
+    ch.style.viewTransitionName = "estado"; // se transforma de un valor al otro al empezar/terminar de usar
     chips.appendChild(ch);
   }
   var desg = valor("desgaste");
   if (/[★☆]/.test(desg)) {
     var est = document.createElement("span"); est.className = "estrellas";
-    est.setAttribute("aria-label", "Desgaste: " + (desg.match(/★/g) || []).length + " de " + desg.replace(/[^★☆]/g, "").length);
+    est.setAttribute("role", "img");
+    est.setAttribute("aria-label", "Desgaste: " + (desg.match(/★/g) || []).length + " de " + desg.replace(/[^★☆]/g, "").length + " estrellas");
     desg.replace(/[^★☆]/g, "").split("").forEach(function (s) {
-      var sp = document.createElement("span"); sp.className = s === "★" ? "llena" : "vacia"; sp.textContent = "★"; est.appendChild(sp);
+      var sp = document.createElement("span"); sp.className = s === "★" ? "llena" : "vacia"; sp.textContent = s;
+      sp.setAttribute("aria-hidden", "true"); est.appendChild(sp);
     });
     chips.appendChild(est);
   }
@@ -402,11 +596,11 @@ function decorar() {
   });
 
   // Íconos en las etiquetas y "hace N días" en la verificación
-  var etiquetas = { "ubicacion": "📍", "ult. verificacion": "✅", "notas": "📝" };
+  var etiquetas = { "ubicacion": "map-pin", "ult. verificacion": "calendar-check", "notas": "notebook-pen" };
   Object.keys(etiquetas).forEach(function (k) {
     if (!filas[k]) return;
-    var s = document.createElement("span"); s.className = "ico"; s.setAttribute("aria-hidden", "true"); s.textContent = etiquetas[k];
-    filas[k].th.insertBefore(s, filas[k].th.firstChild);
+    var t = document.createElement("template"); t.innerHTML = svg(etiquetas[k]);
+    filas[k].th.insertBefore(t.content.firstChild, filas[k].th.firstChild);
   });
   var fv = filas["ult. verificacion"];
   if (fv) {
@@ -418,38 +612,233 @@ function decorar() {
   }
 }
 
-function pintar(res) {
+// Entrada escalonada de la ficha (solo al escanear): tope de 10 elementos, menos de ~450 ms en total.
+function entrada() {
+  var c = tarjeta();
+  animar(c, [{ opacity: .4, transform: "translateY(8px)" }, { opacity: 1, transform: "none" }], { duration: 300, easing: "ease-out" });
+  var partes = [];
+  [".hero", ".chips"].forEach(function (s) { var e = c.querySelector(s); if (e) partes.push(e); });
+  Array.prototype.forEach.call(c.querySelectorAll("table tr:not(.oculta)"), function (e) { partes.push(e); });
+  [".herr", ".adm"].forEach(function (s) { var e = c.querySelector(s); if (e) partes.push(e); });
+  partes.slice(0, 10).forEach(function (e, i) {
+    animar(e, [{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }],
+      { duration: 320, delay: i * 40, easing: "cubic-bezier(.2, .8, .2, 1)", fill: "backwards" });
+  });
+  Array.prototype.forEach.call(c.querySelectorAll(".estrellas .llena"), function (e, i) {
+    animar(e, [{ opacity: 0, transform: "scale(.3) rotate(-30deg)" }, { opacity: 1, transform: "none" }],
+      { duration: 420, delay: 220 + i * 70, easing: RESORTE, fill: "backwards" });
+  });
+}
+
+// ¿Qué dijo el servidor? Lee los mensajes .ok / .err de la tarjeta que devolvió.
+function resultado(res) {
+  var r = { ok: "", err: res.error || "" };
+  if (res.html) {
+    var t = document.createElement("template"); t.innerHTML = res.html;
+    var ok = t.content.querySelector("#msg .ok"), err = t.content.querySelector("#msg .err");
+    if (ok) r.ok = ok.textContent.trim();
+    if (err) r.err = err.textContent.trim();
+  }
+  return r;
+}
+
+// ===== Festejos =====
+var confettiListo = null;
+function cargarConfetti() {
+  if (window.confetti) return Promise.resolve(window.confetti);
+  if (!confettiListo) confettiListo = new Promise(function (ok, mal) {
+    var s = document.createElement("script"); s.src = "js/confetti.browser.min.js"; s.async = true;
+    s.onload = function () { ok(window.confetti); };
+    s.onerror = function () { confettiListo = null; mal(new Error("confetti")); };
+    document.head.appendChild(s);
+  });
+  return confettiListo;
+}
+var FORMAS = null;
+function formas(conf) { // hojas y olivas en lugar de papelitos
+  if (!FORMAS && conf.shapeFromPath) {
+    try {
+      FORMAS = [
+        // matrices calculadas una vez con shapeFromPath({ path }).matrix: evitan ~100 ms de cálculo en el primer festejo
+        conf.shapeFromPath({ path: "M0 10 C5 0 15 0 20 10 C15 20 5 20 0 10 Z", matrix: [0.5, 0, 0, 0.5, -5, -5] }),
+        conf.shapeFromPath({ path: "M6 0 C9.3 0 12 3.6 12 8 C12 12.4 9.3 16 6 16 C2.7 16 0 12.4 0 8 C0 3.6 2.7 0 6 0 Z", matrix: [0.625, 0, 0, 0.625, -3.75, -5] }),
+        "circle"];
+    } catch (e) { FORMAS = ["circle", "square"]; }
+  }
+  return FORMAS || ["circle", "square"];
+}
+// tipo: "grande" (verificado), "chico" (devuelta), "check" (empezó a usar)
+function festejar(tipo) {
+  if (SIN_ANIMACION || !PUEDE_ANIMAR) return;
+  var capa = document.createElement("div"); capa.className = "festejo"; capa.setAttribute("aria-hidden", "true");
+  capa.innerHTML = '<div class="sello"><svg viewBox="0 0 24 24"><path pathLength="1" d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>';
+  document.body.appendChild(capa);
+  var sello = capa.querySelector(".sello"), trazo = capa.querySelector("path");
+  animar(sello, [{ transform: "scale(0)", opacity: 0 }, { transform: "scale(1)", opacity: 1 }], { duration: 650, easing: RESORTE, fill: "both" });
+  animar(trazo, [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 420, delay: 220, easing: "ease-out", fill: "both" });
+  var salida = animar(capa, [{ opacity: 1 }, { opacity: 0, transform: "scale(1.06)" }], { duration: 320, delay: 1250, easing: "ease-in", fill: "forwards" });
+  if (salida) salida.onfinish = function () { capa.remove(); }; else setTimeout(function () { capa.remove(); }, 1600);
+
+  if (tipo === "check") return;
+  var pedido = Date.now();
+  cargarConfetti().then(function (conf) {
+    if (!conf || Date.now() - pedido > 1500) return; // con señal débil llegaría tarde y fuera de contexto
+    var base = { colors: COLORES_MARCA, shapes: formas(conf), scalar: 1.15, disableForReducedMotion: true, zIndex: 60 };
+    if (tipo === "grande") {
+      conf(Object.assign({}, base, { particleCount: 45, spread: 75, startVelocity: 42, origin: { x: .5, y: .5 } }));
+      setTimeout(function () {
+        conf(Object.assign({}, base, { particleCount: 18, angle: 60, spread: 55, origin: { x: 0, y: .7 } }));
+        conf(Object.assign({}, base, { particleCount: 18, angle: 120, spread: 55, origin: { x: 1, y: .7 } }));
+      }, 180);
+    } else {
+      conf(Object.assign({}, base, { particleCount: 30, spread: 60, startVelocity: 34, origin: { x: .5, y: .5 } }));
+    }
+  }).catch(function () {});
+}
+function sacudir(el) {
+  animar(el, [{ transform: "translateX(0)" }, { transform: "translateX(-10px)" }, { transform: "translateX(9px)" },
+    { transform: "translateX(-7px)" }, { transform: "translateX(5px)" }, { transform: "translateX(-2px)" }, { transform: "translateX(0)" }],
+    { duration: 380, easing: "ease-out" });
+}
+
+// ===== Sin señal: última ficha guardada en el celular =====
+var modoSinSenal = false;
+function guardarFicha(res) {
+  if (!ID_ART || !res.html) return;
+  // Sin el panel administrativo ni mensajes: en un celular compartido no queda nada de la sesión de un administrativo.
+  var t = document.createElement("template"); t.innerHTML = res.html;
+  Array.prototype.forEach.call(t.content.querySelectorAll(".adm"), function (e) { e.remove(); });
+  var m = t.content.querySelector("#msg"); if (m) m.innerHTML = "";
+  ls(CLAVE_FICHA + ID_ART, JSON.stringify({ html: t.innerHTML, titulo: res.titulo || "", t: Date.now() }));
+}
+var reintentoSinSenal = null, esperaReintento = 15000;
+function reintentar() {
+  if (reintentoSinSenal) { clearTimeout(reintentoSinSenal); reintentoSinSenal = null; }
+  if (modoSinSenal && ID_ART) llamar("escaneo", [ID_ART, ls(CLAVE_T)]);
+}
+function programarReintento() { // 15 s, 30 s, 60 s... hasta 2 min, mientras siga sin señal
+  if (reintentoSinSenal) clearTimeout(reintentoSinSenal);
+  reintentoSinSenal = setTimeout(reintentar, esperaReintento);
+  esperaReintento = Math.min(esperaReintento * 2, 120000);
+}
+function mostrarSinSenal(motivo) {
+  modoSinSenal = true;
+  var guardada = null;
+  try { guardada = JSON.parse(ls(CLAVE_FICHA + ID_ART) || "null"); } catch (e) {}
+  if (!guardada || !guardada.html) {
+    soloMensaje(motivo === "servidor" ? "No se pudo cargar" : "Sin conexión", "wifi-off");
+    aviso(motivo === "servidor" ? "El inventario no respondió bien. Se vuelve a intentar solo en unos segundos."
+      : "No se pudo conectar con el inventario. Revisá la señal: se vuelve a intentar solo.", "err");
+    agregarReintentar(document.getElementById("msg"));
+  } else {
+    if (guardada.titulo) document.title = guardada.titulo + " · Inventario";
+    tarjeta().innerHTML = guardada.html; decorar(); entrada();
+    var m = document.getElementById("msg"); if (m) m.innerHTML = "";
+    botones(false); tarjeta().classList.add("congelada");
+    var f = document.createElement("div"); f.className = "franja"; f.setAttribute("role", "status");
+    f.innerHTML = svg("wifi-off") + "<div><b></b> <span></span></div>";
+    f.querySelector("b").textContent = motivo === "servidor" ? "El inventario no respondió." : "Sin señal.";
+    f.querySelector("span").textContent = "Estás viendo la ficha guardada " + haceRato(Date.now() - guardada.t) +
+      ". Se vuelve a intentar solo.";
+    agregarReintentar(f.querySelector("div"));
+    tarjeta().insertBefore(f, tarjeta().firstChild);
+    animar(f, [{ opacity: 0, transform: "translateY(-8px)" }, { opacity: 1, transform: "none" }], { duration: 300, easing: "ease-out" });
+  }
+  programarReintento();
+}
+function agregarReintentar(donde) {
+  if (!donde) return;
+  var b = document.createElement("button"); b.type = "button"; b.className = "reintentar"; b.textContent = "Reintentar ahora";
+  b.onclick = function () { b.disabled = true; b.textContent = "Intentando…"; reintentar(); };
+  donde.appendChild(b);
+}
+window.addEventListener("online", reintentar);
+document.addEventListener("visibilitychange", function () { if (!document.hidden) reintentar(); });
+
+// ===== Pedidos al servidor =====
+function anunciar(texto) { // región fija fuera de la tarjeta: los lectores de pantalla la leen siempre
+  var a = document.getElementById("anuncio"); if (!a || !texto) return;
+  a.textContent = ""; setTimeout(function () { a.textContent = texto; }, 60);
+}
+function pintar(res, fn, alTerminar) {
   if (res.titulo) document.title = res.titulo + " · Inventario";
   if (res.sesionVencida) ls(CLAVE_T, null);
   if (res.token) ls(CLAVE_T, res.token);
-  if (res.html) { tarjeta().innerHTML = res.html; decorar(); animar(); }
-  else if (res.titulo) soloMensaje(res.titulo, /no encontrado/i.test(res.titulo) ? "🔍" : "🏷️");
-  else botones(true);
-  if (res.error) aviso(res.error, "err");
-  recordar();
+  var r = resultado(res);
+  // Lo que va después de dibujar la tarjeta nueva (con View Transition, el dibujo es asíncrono).
+  var despues = function () {
+    if (res.error) aviso(res.error, "err");
+    if (fn !== "escaneo") {
+      anunciar(r.err || r.ok);
+      var m = document.getElementById("msg"); // que el resultado se vea aunque el botón estuviera abajo
+      if (m && m.firstChild && m.getBoundingClientRect().top < 0) m.scrollIntoView({ behavior: SIN_ANIMACION ? "auto" : "smooth", block: "start" });
+    }
+    if (alTerminar) alTerminar();
+    if (!r.err && r.ok) {
+      if (fn === "verificarAdmin") festejar("grande");
+      else if (fn === "terminarUso") festejar("chico");
+      else if (fn === "empezarUso") festejar("check");
+    }
+  };
+  if (res.html) {
+    var aplicar = function () { tarjeta().innerHTML = res.html; decorar(); recordar(); };
+    if (fn === "escaneo") { aplicar(); entrada(); despues(); }
+    else if (document.startViewTransition && !SIN_ANIMACION) {
+      var tr = null;
+      try { tr = document.startViewTransition(aplicar); } catch (e) {}
+      if (tr) tr.updateCallbackDone.then(despues, function () { aplicar(); despues(); });
+      else { aplicar(); despues(); }
+    } else { aplicar(); despues(); }
+    if (fn === "escaneo" || fn === "ficha") guardarFicha(res);
+  } else {
+    if (res.titulo) soloMensaje(res.titulo, /no encontrado/i.test(res.titulo) ? "search-x" : "tag");
+    else botones(true);
+    despues();
+  }
+  return r;
 }
 // Texto plano = pedido "simple" (sin preflight CORS). credentials "omit" = sin cookies de Google (sin /u/N/).
-function llamar(fn, args, espera) {
+var TIEMPO_MAX = 25000; // ms: Apps Script a veces tarda unos segundos; más que esto es señal colgada
+function pedir(fn, args) {
+  var ctrl = typeof AbortController === "function" ? new AbortController() : null;
+  var reloj;
+  var limite = new Promise(function (ok, mal) {
+    reloj = setTimeout(function () { if (ctrl) ctrl.abort(); mal(new Error("timeout")); }, TIEMPO_MAX);
+  });
+  var opciones = { method: "POST", body: JSON.stringify({ fn: fn, args: args }), credentials: "omit", redirect: "follow" };
+  if (ctrl) opciones.signal = ctrl.signal;
+  var pedido = fetch(API, opciones).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+  return Promise.race([pedido, limite]).then(
+    function (v) { clearTimeout(reloj); return v; },
+    function (e) { clearTimeout(reloj); throw e; });
+}
+function llamar(fn, args, espera, alTerminar) {
   botones(false);
   if (espera) aviso(espera, "info");
-  fetch(API, { method: "POST", body: JSON.stringify({ fn: fn, args: args }), credentials: "omit", redirect: "follow" })
-    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-    .then(pintar)
+  pedir(fn, args)
+    .then(function (res) {
+      // Escaneo sin tarjeta ni título = error del servidor (cuota, hoja ocupada): igual que sin señal.
+      if (fn === "escaneo" && !res.html && !res.titulo) { mostrarSinSenal("servidor"); return; }
+      modoSinSenal = false; esperaReintento = 15000;
+      if (reintentoSinSenal) { clearTimeout(reintentoSinSenal); reintentoSinSenal = null; }
+      tarjeta().classList.remove("congelada");
+      pintar(res, fn, alTerminar);
+    })
     .catch(function () {
+      if (fn === "escaneo") { mostrarSinSenal(); return; }
+      if (modoSinSenal) return;
       botones(true);
-      if (!tarjeta().querySelector("h1")) soloMensaje("Sin conexión", "📡");
       aviso("No se pudo conectar con el inventario. Revisá la señal y probá de nuevo.", "err");
+      anunciar("No se pudo conectar con el inventario.");
     });
 }
 function valor(id) { return document.getElementById(id).value; }
 function usar(accion) {
   var s = document.getElementById("persona");
-  if (!s.value) { aviso("Elegí tu nombre primero.", "err"); return; }
+  if (!s.value) { aviso("Elegí tu nombre primero.", "err"); sacudir(s); return; }
   ls(CLAVE_P, s.value);
   llamar(accion === "empezar" ? "empezarUso" : "terminarUso", [ID_ART, s.value, ls(CLAVE_T)], "Guardando…");
 }
-function mostrar(id) { document.getElementById(id).className = ""; }
-function entrar() { llamar("entrarAdmin", [ID_ART, valor("adm-nombre"), valor("adm-pin")], "Verificando PIN…"); }
 function salir() { var t = ls(CLAVE_T); ls(CLAVE_T, null); llamar("salirAdmin", [ID_ART, t]); }
 function verificar() { llamar("verificarAdmin", [ID_ART, ls(CLAVE_T)], "Guardando…"); }
 function guardar() {
@@ -458,8 +847,107 @@ function guardar() {
   }], "Guardando…");
 }
 
-if (ID_ART) llamar("escaneo", [ID_ART, ls(CLAVE_T)]);
-else { soloMensaje("Falta el ID", "🏷️"); aviso("El QR no tiene un ID de artículo.", "err"); }
+// ===== Modo administrativo: PIN en una ventana que sube desde abajo =====
+// El servidor manda un formulario oculto (#login) con la lista de administrativos; acá se usa en un <dialog>.
+// Sin soporte de <dialog> (navegadores muy viejos) se muestra el formulario original dentro de la tarjeta.
+var TIENE_DIALOG = typeof HTMLDialogElement === "function" && typeof HTMLDialogElement.prototype.showModal === "function";
+function mostrar(id) {
+  if (id === "login" && TIENE_DIALOG && document.getElementById("adm-nombre")) { abrirPin(); return; }
+  document.getElementById(id).className = "";
+}
+function entrar() { llamar("entrarAdmin", [ID_ART, valor("adm-nombre"), valor("adm-pin")], "Verificando PIN…"); }
+function dialogoPin() {
+  var d = document.getElementById("dlg-pin");
+  if (d) return d;
+  d = document.createElement("dialog"); d.className = "hoja"; d.id = "dlg-pin"; d.setAttribute("aria-labelledby", "dlg-titulo");
+  d.innerHTML = '<div class="asa"></div>' +
+    '<div class="hoja-cab"><div class="candado">' + svg("lock") + '</div><h2 id="dlg-titulo">Modo administrativo</h2>' +
+    '<button type="button" class="cerrar" aria-label="Cerrar">×</button></div>' +
+    '<div id="dlg-msg" role="alert"></div>' +
+    '<label for="dlg-nombre">Administrativo</label><select id="dlg-nombre"></select>' +
+    '<label for="dlg-pin-in">PIN</label><input id="dlg-pin-in" type="password" inputmode="numeric" autocomplete="off" enterkeyhint="go" autofocus>' +
+    '<button type="button" class="btn" id="dlg-entrar">' + svg("lock-open") + 'Entrar</button>';
+  document.body.appendChild(d);
+  d.querySelector(".cerrar").onclick = function () { d.close(); };
+  d.addEventListener("click", function (e) { // tocar afuera (el fondo oscuro) cierra; el borde interno no
+    if (e.target !== d) return;
+    var b = d.getBoundingClientRect();
+    if (e.clientX < b.left || e.clientX > b.right || e.clientY < b.top || e.clientY > b.bottom) d.close();
+  });
+  d.querySelector("#dlg-entrar").onclick = entrarDialogo;
+  d.addEventListener("close", function () { d.querySelector("#dlg-pin-in").value = ""; intentoPin++; });
+  d.querySelector("#dlg-pin-in").addEventListener("keydown", function (e) { if (e.key === "Enter") entrarDialogo(); });
+  return d;
+}
+function abrirPin() {
+  var d = dialogoPin(), sel = d.querySelector("#dlg-nombre"), origen = document.getElementById("adm-nombre");
+  sel.innerHTML = "";
+  Array.prototype.forEach.call(origen.options, function (o) {
+    var op = document.createElement("option"); op.textContent = o.textContent; sel.appendChild(op);
+  });
+  var ultimo = ls(CLAVE_ADMIN);
+  if (ultimo) Array.prototype.forEach.call(sel.options, function (o) { if (o.textContent === ultimo) sel.value = ultimo; });
+  d.querySelector("#dlg-msg").innerHTML = "";
+  d.querySelector("#dlg-pin-in").value = "";
+  d.querySelector(".candado").innerHTML = svg("lock");
+  d.querySelector("#dlg-entrar").disabled = false;
+  d.showModal(); // con autofocus el PIN queda enfocado dentro del toque (en iPhone abre el teclado)
+  var campo = d.querySelector("#dlg-pin-in");
+  if (document.activeElement !== campo) { try { campo.focus(); } catch (e) {} }
+}
+function errorDialogo(d, texto) {
+  var m = d.querySelector("#dlg-msg"); m.innerHTML = "";
+  var div = document.createElement("div"); div.className = "err"; div.textContent = texto; m.appendChild(div);
+  sacudir(d);
+}
+var intentoPin = 0;
+function entrarDialogo() {
+  var d = document.getElementById("dlg-pin"), btn = d.querySelector("#dlg-entrar");
+  if (btn.disabled) return; // Enter + botón, o doble toque: un solo envío (no gasta intentos de más)
+  var campo = d.querySelector("#dlg-pin-in");
+  var nombre = d.querySelector("#dlg-nombre").value, pin = campo.value;
+  if (!pin) { errorDialogo(d, "Escribí tu PIN."); return; }
+  campo.value = "";
+  btn.disabled = true;
+  var m = d.querySelector("#dlg-msg"); m.innerHTML = "";
+  var info = document.createElement("div"); info.className = "info"; info.textContent = "Verificando PIN…"; m.appendChild(info);
+  var este = ++intentoPin;
+  pedir("entrarAdmin", [ID_ART, nombre, pin]).then(function (res) {
+    if (este !== intentoPin || !d.open) return; // se cerró (o se volvió a abrir) antes de la respuesta
+    if (res.token) {
+      ls(CLAVE_ADMIN, nombre);
+      var cand = d.querySelector(".candado"); cand.innerHTML = svg("lock-open");
+      var a = animar(cand, [{ transform: "scale(1)" }, { transform: "scale(1.25) rotate(-8deg)" }, { transform: "scale(1)" }], { duration: 420, easing: RESORTE });
+      var cerrar = function () {
+        d.close();
+        pintar(res, "entrarAdmin", function () { // después de dibujar la tarjeta nueva
+          var adm = tarjeta().querySelector(".adm");
+          if (adm) adm.scrollIntoView({ behavior: SIN_ANIMACION ? "auto" : "smooth", block: "nearest" });
+        });
+      };
+      if (a) a.onfinish = cerrar; else cerrar();
+    } else {
+      var texto = resultado(res).err || "No se pudo entrar.";
+      btn.disabled = false;
+      errorDialogo(d, texto);
+      anunciar(texto);
+      try { campo.focus(); } catch (e) {}
+    }
+  }).catch(function () {
+    if (este !== intentoPin || !d.open) return;
+    btn.disabled = false;
+    errorDialogo(d, "No se pudo conectar. Revisá la señal y probá de nuevo.");
+  });
+}
+
+// Precarga el confeti (en segundo plano) si la ficha tiene herramientas o panel administrativo.
+function precargarConfetti() {
+  if (SIN_ANIMACION || window.confetti || !tarjeta().querySelector(".herr, .adm .quien")) return;
+  var ir = function () { cargarConfetti().catch(function () {}); };
+  if (window.requestIdleCallback) requestIdleCallback(ir, { timeout: 4000 }); else setTimeout(ir, 2500);
+}
+if (ID_ART) llamar("escaneo", [ID_ART, ls(CLAVE_T)], null, precargarConfetti);
+else { soloMensaje("Falta el ID", "tag"); aviso("El QR no tiene un ID de artículo.", "err"); }
 </script>
 </body>
 </html>
