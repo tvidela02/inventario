@@ -2,45 +2,260 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
-<title>Inventario</title>
+<meta name="theme-color" content="#26532B">
+<title>Inventario · Olivos Patagónicos</title>
+<link rel="icon" type="image/png" href="img/isur_logo_claro.png">
 <!--
   Ficha del inventario fuera de Google (GitHub Pages). El QR apunta acá: ?id=05
   Los datos los da el Apps Script (Api.gs) por fetch SIN cookies de Google (credentials: 'omit'),
   así no hay redirección a /macros/u/N/ cuando el celular tiene varias cuentas de Google.
-  La tarjeta la arma el servidor (Ficha.gs), igual que en la ficha original: acá solo se muestra.
-  Mismo estilo que ESTILO_FICHA_ en Ficha.gs.
+  La tarjeta la arma el servidor (Ficha.gs) con las mismas clases que la ficha original; acá se muestra
+  y se "decora" (decorar()): ícono por categoría, etiqueta de disponibilidad, estrellas y "hace N días".
+  Tema claro/oscuro: botón en el encabezado, se guarda en el celular; la primera vez sigue al teléfono.
+  Colores de marca iSUR (Sensores Draginos/06_Marca/paleta_grafana.md).
 -->
+<script>
+// Tema antes de pintar, para que no parpadee.
+(function () {
+  var t = null;
+  try { t = localStorage.getItem("inventario_tema"); } catch (e) {}
+  if (t !== "dark" && t !== "light") t = window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
 <style>
-body{font-family:Arial,sans-serif;margin:0;padding:20px;background:#f4f6f8;color:#222}
-.card{background:#fff;border-radius:12px;padding:20px;max-width:480px;margin:auto;box-shadow:0 2px 8px rgba(0,0,0,.08)}
-.id{color:#666;font-size:14px}h1{font-size:22px;margin:4px 0 16px}h2{font-size:17px;margin:20px 0 4px}
-table{width:100%;border-collapse:collapse;margin-bottom:16px}
-th{text-align:left;color:#666;font-weight:normal;padding:8px 8px 8px 0;width:40%;vertical-align:top}
-td{padding:8px 0;border-bottom:1px solid #eee}
-.btn{display:block;width:100%;box-sizing:border-box;text-align:center;background:#1a73e8;color:#fff;text-decoration:none;
-  padding:14px;border:0;border-radius:8px;margin-top:10px;font-size:16px;cursor:pointer}
-.sec{background:#e8eaed;color:#222}.usar{background:#188038}.dev{background:#e37400}
-button:disabled{opacity:.6}
-.ok,.err,.info{padding:12px;border-radius:8px;margin-bottom:12px}
-.ok{background:#e6f4ea;color:#137333}.err{background:#fce8e6;color:#a50e0e}.info{background:#e8f0fe;color:#174ea6}
-.herr,.adm{border-top:1px solid #eee;padding-top:12px;margin-top:12px}
-.estado{padding:12px;border-radius:8px;margin-bottom:12px;font-size:16px}
-.libre{background:#e6f4ea;color:#137333}.uso{background:#fef7e0;color:#8a5a00}.mant{background:#fce8e6;color:#a50e0e}
-label{display:block;color:#666;margin:10px 0 6px}
-select,input,textarea{width:100%;box-sizing:border-box;font-size:16px;padding:12px;border:1px solid #ccc;border-radius:8px;
-  background:#fff;font-family:inherit}
-.quien{color:#444;margin-bottom:4px}.nota{color:#666;font-size:14px;margin-top:8px}.oculto{display:none}
+:root {
+  --marca: #26532B;        /* Dark Spruce: encabezado */
+  --marca-2: #1F7A4D;      /* verde profundo: botones principales */
+  --verde: #399E5A;        /* Shamrock */
+  --azul: #3E78B2;         /* Rich Cerulean */
+  --oro: #B08E1E;
+  --rojo: #C0392B;
+  --fondo: #EEF2EE;
+  --superficie: #FFFFFF;
+  --superficie-2: #F5F8F5;
+  --texto: #1B241D;
+  --texto-2: #5B6B5F;
+  --borde: #DDE5DE;
+  --sombra: 0 10px 30px rgba(38, 83, 43, .10), 0 2px 6px rgba(0, 0, 0, .05);
+  --ok-fondo: #E4F3E8; --ok-texto: #1E6B3A;
+  --err-fondo: #FBE7E4; --err-texto: #9B2A1F;
+  --info-fondo: #E6EEF7; --info-texto: #24548A;
+  --aten-fondo: #FBF1D6; --aten-texto: #7A5D08;
+  --btn-dev: #8C6D0F;
+  --estrella: #C99A06;
+  --estrella-vacia: #CFD6D0;
+  --brillo: rgba(255, 255, 255, .6);
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  --fondo: #0D1510;
+  --superficie: #16231A;
+  --superficie-2: #1C2C21;
+  --texto: #E4EEE6;
+  --texto-2: #9DB1A3;
+  --borde: #2A3D30;
+  --sombra: 0 10px 30px rgba(0, 0, 0, .45);
+  --ok-fondo: #173524; --ok-texto: #8FDCA8;
+  --err-fondo: #3A1C18; --err-texto: #F3A79C;
+  --info-fondo: #182A3D; --info-texto: #9CC3EC;
+  --aten-fondo: #352B10; --aten-texto: #E8C766;
+  --btn-dev: #A07C12;
+  --estrella: #E8B923;
+  --estrella-vacia: #3A4A3F;
+  --brillo: rgba(255, 255, 255, .06);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: var(--fondo); color: var(--texto); min-height: 100vh;
+  display: flex; flex-direction: column; -webkit-font-smoothing: antialiased;
+}
+/* Respaldo sin View Transitions: fundido de colores */
+html.fundido, html.fundido * { transition: background-color .4s ease, color .4s ease, border-color .4s ease !important; }
+
+/* ===== Encabezado ===== */
+header {
+  background: linear-gradient(135deg, #26532B 0%, #1F6B3C 60%, #2E8A4E 100%);
+  color: #fff; padding: calc(14px + env(safe-area-inset-top)) 16px 46px; position: relative; overflow: hidden;
+}
+header::after { /* hojas decorativas */
+  content: ""; position: absolute; right: -40px; top: -50px; width: 180px; height: 180px; border-radius: 50%;
+  border: 26px solid rgba(255, 255, 255, .07);
+}
+.barra { max-width: 520px; margin: auto; display: flex; align-items: center; gap: 12px; position: relative; z-index: 1; }
+.marca-ico {
+  width: 42px; height: 42px; border-radius: 12px; background: rgba(255, 255, 255, .14);
+  display: grid; place-items: center; font-size: 22px; flex: none;
+}
+.marca-txt { flex: 1; min-width: 0; }
+.marca-txt b { display: block; font-size: 17px; letter-spacing: .2px; }
+.marca-txt span { display: block; font-size: 13px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.tema {
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .25);
+  background: rgba(255, 255, 255, .12); color: #fff; cursor: pointer; position: relative; flex: none;
+  display: grid; place-items: center; -webkit-tap-highlight-color: transparent;
+}
+.tema:active { transform: scale(.92); }
+.tema svg { width: 22px; height: 22px; position: absolute; transition: transform .5s cubic-bezier(.5, -.4, .3, 1.4), opacity .3s; }
+.tema .sol { opacity: 1; transform: rotate(0) scale(1); }
+.tema .luna { opacity: 0; transform: rotate(-90deg) scale(.4); }
+[data-theme="dark"] .tema .sol { opacity: 0; transform: rotate(90deg) scale(.4); }
+[data-theme="dark"] .tema .luna { opacity: 1; transform: rotate(0) scale(1); }
+
+/* ===== Tarjeta ===== */
+main { flex: 1; padding: 0 14px; margin-top: -32px; position: relative; z-index: 2; }
+.card {
+  background: var(--superficie); border-radius: 18px; padding: 20px; max-width: 520px; margin: auto;
+  box-shadow: var(--sombra); border: 1px solid var(--borde);
+}
+.aparecer { animation: aparecer .45s cubic-bezier(.2, .8, .2, 1); }
+@keyframes aparecer { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+
+/* Esqueleto mientras carga */
+.esq { border-radius: 10px; background: var(--superficie-2); position: relative; overflow: hidden; margin-bottom: 12px; }
+.esq::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--brillo), transparent); animation: brillo 1.3s infinite;
+}
+@keyframes brillo { to { transform: translateX(100%); } }
+
+/* Cabecera del artículo (la arma decorar()) */
+.hero { display: flex; gap: 14px; align-items: center; margin-bottom: 16px; }
+.icono {
+  width: 64px; height: 64px; border-radius: 18px; flex: none; display: grid; place-items: center; font-size: 34px;
+  background: linear-gradient(145deg, var(--ok-fondo), var(--superficie-2)); border: 1px solid var(--borde);
+}
+.hero-txt { min-width: 0; }
+.meta { color: var(--texto-2); font-size: 13px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pill-id { background: var(--superficie-2); border: 1px solid var(--borde); border-radius: 999px; padding: 2px 9px; font-weight: 600; font-variant-numeric: tabular-nums; }
+h1 { font-size: 22px; line-height: 1.2; margin: 4px 0 0; }
+h2 { font-size: 16px; margin: 20px 0 4px; }
+.id { color: var(--texto-2); font-size: 14px; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 14px; font-weight: 600; }
+.chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.chip-ok { background: var(--ok-fondo); color: var(--ok-texto); }
+.chip-uso { background: var(--info-fondo); color: var(--info-texto); }
+.chip-mant { background: var(--aten-fondo); color: var(--aten-texto); }
+.chip-crit { background: var(--err-fondo); color: var(--err-texto); }
+.chip-neutro { background: var(--superficie-2); color: var(--texto-2); }
+.estrellas { font-size: 18px; letter-spacing: 1px; white-space: nowrap; }
+.estrellas .llena { color: var(--estrella); }
+.estrellas .vacia { color: var(--estrella-vacia); }
+
+/* Datos */
+table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+tr.oculta { display: none; }
+th { text-align: left; color: var(--texto-2); font-weight: 500; padding: 11px 8px 11px 0; width: 42%; vertical-align: top; font-size: 14px; }
+td { padding: 11px 0; border-bottom: 1px solid var(--borde); }
+tr:last-child td { border-bottom: 0; }
+th .ico { display: inline-block; width: 22px; }
+.rel { display: block; color: var(--texto-2); font-size: 13px; margin-top: 2px; }
+
+/* Botones */
+.btn {
+  display: block; width: 100%; text-align: center; background: var(--marca-2); color: #fff; text-decoration: none;
+  padding: 15px; border: 0; border-radius: 12px; margin-top: 10px; font-size: 16px; font-weight: 600; cursor: pointer;
+  font-family: inherit; box-shadow: 0 2px 0 rgba(0, 0, 0, .12); transition: transform .12s, filter .2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:active { transform: scale(.98); filter: brightness(.95); }
+.sec { background: var(--superficie-2); color: var(--texto); border: 1px solid var(--borde); box-shadow: none; }
+.usar { background: var(--marca-2); }
+.dev { background: var(--btn-dev); }
+button:disabled { opacity: .55; cursor: wait; }
+a { color: var(--azul); }
+[data-theme="dark"] a { color: #8DB8E6; }
+
+/* Mensajes y estados */
+.ok, .err, .info { padding: 12px 14px; border-radius: 12px; margin-bottom: 12px; font-size: 15px; animation: aparecer .3s ease; }
+.ok { background: var(--ok-fondo); color: var(--ok-texto); }
+.err { background: var(--err-fondo); color: var(--err-texto); }
+.info { background: var(--info-fondo); color: var(--info-texto); }
+.herr, .adm { border-top: 1px solid var(--borde); padding-top: 14px; margin-top: 14px; }
+.estado { padding: 13px 14px; border-radius: 12px; margin-bottom: 12px; font-size: 16px; }
+.libre { background: var(--ok-fondo); color: var(--ok-texto); }
+.uso { background: var(--aten-fondo); color: var(--aten-texto); }
+.mant { background: var(--err-fondo); color: var(--err-texto); }
+
+/* Formularios */
+label { display: block; color: var(--texto-2); margin: 12px 0 6px; font-size: 14px; }
+select, input, textarea {
+  width: 100%; font-size: 16px; padding: 12px; border: 1px solid var(--borde); border-radius: 10px;
+  background: var(--superficie-2); color: var(--texto); font-family: inherit;
+}
+select:focus, input:focus, textarea:focus { outline: 2px solid var(--verde); outline-offset: 1px; }
+.quien { color: var(--texto-2); margin-bottom: 4px; }
+.nota { color: var(--texto-2); font-size: 14px; margin-top: 8px; }
+.oculto { display: none; }
+
+/* Mensaje sin tarjeta (no encontrado, sin conexión) */
+.vacio { text-align: center; padding: 10px 0 4px; }
+.vacio .grande { font-size: 52px; margin-bottom: 6px; }
+
+/* ===== Pie ===== */
+footer { text-align: center; padding: 26px 16px calc(22px + env(safe-area-inset-bottom)); color: var(--texto-2); font-size: 12px; }
+footer img { height: 84px; display: block; margin: 0 auto 8px; }
+.logo-oscuro { display: none !important; }
+[data-theme="dark"] .logo-claro { display: none !important; }
+[data-theme="dark"] .logo-oscuro { display: block !important; }
+
+/* Animación del cambio de tema: el tema nuevo crece en círculo desde el botón */
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
 </style>
 </head>
 <body>
-<div class="card" id="card"><div id="msg"><div class="info">Cargando…</div></div></div>
+<header>
+  <div class="barra">
+    <div class="marca-ico" aria-hidden="true">🫒</div>
+    <div class="marca-txt">
+      <b id="marca-nombre">Olivos Patagónicos</b>
+      <span id="marca-sitio">Inventario · Polo Olivícola Dolavon</span>
+    </div>
+    <button class="tema" id="tema" type="button" aria-label="Cambiar entre modo claro y oscuro" onclick="cambiarTema(event)">
+      <svg class="sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+      <svg class="luna" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a.6.6 0 0 0-.8-.7A9.5 9.5 0 1 0 21.2 15.4a.6.6 0 0 0-.7-.8Z"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <div class="card" id="card">
+    <div id="msg"></div>
+    <div class="hero"><div class="esq" style="width:64px;height:64px;border-radius:18px;margin:0"></div>
+      <div style="flex:1"><div class="esq" style="height:12px;width:40%"></div><div class="esq" style="height:22px;width:75%;margin:0"></div></div></div>
+    <div class="esq" style="height:30px;width:55%;border-radius:999px"></div>
+    <div class="esq" style="height:16px"></div><div class="esq" style="height:16px;width:85%"></div><div class="esq" style="height:16px;width:70%"></div>
+  </div>
+</main>
+
+<footer>
+  <img class="logo-claro" src="img/isur_logo_claro.png" alt="iSUR">
+  <img class="logo-oscuro" src="img/isur_logo_oscuro.png" alt="iSUR">
+  Sistema de inventario por iSUR · inteligencia en red
+</footer>
+
 <script>
 // URL /exec de la implementación única (DEPLOY.md). No cambia nunca.
 var API = "https://script.google.com/macros/s/AKfycbxx0Z46-Mh73unY2Hb9Qjk2jXFyvO68dG97eZskHm1CxAg2cQ6Y5OmS7vkm3y6iumgk/exec";
-var CLAVE_P = "inventario_persona", CLAVE_T = "inventario_token";
+var CLAVE_P = "inventario_persona", CLAVE_T = "inventario_token", CLAVE_TEMA = "inventario_tema";
 var ID_ART = (new URLSearchParams(location.search).get("id") || "").trim();
+var SIN_ANIMACION = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 function ls(k, v) {
   try {
@@ -48,6 +263,35 @@ function ls(k, v) {
     if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v);
   } catch (e) { return null; }
 }
+
+// ===== Tema claro / oscuro =====
+function aplicarTema(t) {
+  document.documentElement.setAttribute("data-theme", t);
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", t === "dark" ? "#0D1510" : "#26532B");
+}
+function cambiarTema(ev) {
+  var nuevo = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+  ls(CLAVE_TEMA, nuevo);
+  if (SIN_ANIMACION) { aplicarTema(nuevo); return; }
+  if (!document.startViewTransition) { // navegadores viejos: fundido de colores
+    var html = document.documentElement;
+    html.classList.add("fundido"); aplicarTema(nuevo);
+    setTimeout(function () { html.classList.remove("fundido"); }, 450);
+    return;
+  }
+  var b = document.getElementById("tema").getBoundingClientRect();
+  var x = b.left + b.width / 2, y = b.top + b.height / 2;
+  var radio = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+  var tr = document.startViewTransition(function () { aplicarTema(nuevo); });
+  tr.ready.then(function () {
+    document.documentElement.animate(
+      { clipPath: ["circle(0px at " + x + "px " + y + "px)", "circle(" + radio + "px at " + x + "px " + y + "px)"] },
+      { duration: 650, easing: "cubic-bezier(.4, 0, .2, 1)", pseudoElement: "::view-transition-new(root)" });
+  });
+}
+
+// ===== Tarjeta =====
 function tarjeta() { return document.getElementById("card"); }
 function aviso(texto, clase) {
   var m = document.getElementById("msg"); if (!m) return;
@@ -62,17 +306,124 @@ function recordar() {
   var s = document.getElementById("persona"), n = ls(CLAVE_P);
   if (s && n) for (var i = 0; i < s.options.length; i++) if (s.options[i].value === n) s.value = n;
 }
-// Sin tarjeta (ID inexistente o falta el ID): título y mensaje solos.
-function soloMensaje(titulo) {
-  var c = tarjeta(); c.innerHTML = '<h1></h1><div id="msg"></div>';
-  c.querySelector("h1").textContent = titulo;
+function animar() {
+  var c = tarjeta(); c.classList.remove("aparecer"); void c.offsetWidth; c.classList.add("aparecer");
 }
+// Sin tarjeta (ID inexistente, falta el ID, sin conexión): ícono, título y mensaje.
+function soloMensaje(titulo, icono) {
+  var c = tarjeta();
+  c.innerHTML = '<div class="vacio"><div class="grande" aria-hidden="true"></div><h1></h1></div><div id="msg"></div>';
+  c.querySelector(".grande").textContent = icono || "📦";
+  c.querySelector("h1").textContent = titulo;
+  animar();
+}
+
+function sinAcentos(s) { return String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim(); }
+var ICONOS = [[/mueble/, "🪑"], [/tecnolog/, "💻"], [/electric/, "⚡"], [/abertura/, "🚪"], [/herramienta/, "🛠️"],
+  [/sanitari/, "🚿"], [/climatiz/, "❄️"], [/material/, "🧱"]];
+function iconoCategoria(cat) {
+  var k = sinAcentos(cat);
+  for (var i = 0; i < ICONOS.length; i++) if (ICONOS[i][0].test(k)) return ICONOS[i][1];
+  return "📦";
+}
+function claseDisponibilidad(v) {
+  var k = sinAcentos(v);
+  if (k === "guardado") return "chip-ok";
+  if (k === "en uso") return "chip-uso";
+  if (/manten/.test(k)) return "chip-mant";
+  if (/no encontr|perdid|baja/.test(k)) return "chip-crit";
+  return "chip-neutro";
+}
+function hace(texto) { // "2025-04-04" → "hace 1 año"
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(texto).trim());
+  if (!m) return "";
+  var f = new Date(+m[1], +m[2] - 1, +m[3]), hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  var d = Math.round((hoy - f) / 86400000);
+  if (d < 0) return "";
+  if (d === 0) return "hoy";
+  if (d === 1) return "ayer";
+  if (d < 31) return "hace " + d + " días";
+  var meses = Math.floor(d / 30.44);
+  if (meses < 12) return "hace " + meses + (meses === 1 ? " mes" : " meses");
+  var anios = Math.floor(meses / 12);
+  return "hace " + anios + (anios === 1 ? " año" : " años");
+}
+function fechaLinda(texto) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(texto).trim());
+  return m ? m[3] + "/" + m[2] + "/" + m[1] : texto;
+}
+
+// Convierte la tabla que manda el servidor en una ficha más visual. Si la estructura no es la esperada, no toca nada.
+function decorar() {
+  var c = tarjeta(), h1 = c.querySelector("h1"), idEl = c.querySelector(".id");
+  if (!h1 || !c.querySelector("table")) return;
+  var filas = {};
+  var trs = c.querySelectorAll("table tr");
+  for (var i = 0; i < trs.length; i++) {
+    var th = trs[i].querySelector("th"), td = trs[i].querySelector("td");
+    if (th && td) filas[sinAcentos(th.textContent)] = { tr: trs[i], th: th, td: td };
+  }
+  function valor(k) { var f = filas[k]; var v = f ? f.td.textContent.trim() : ""; return v === "—" ? "" : v; }
+
+  // Cabecera: ícono, categoría · ID, nombre
+  var cat = valor("categoria");
+  var hero = document.createElement("div"); hero.className = "hero";
+  var ico = document.createElement("div"); ico.className = "icono"; ico.setAttribute("aria-hidden", "true");
+  ico.textContent = iconoCategoria(cat);
+  var txt = document.createElement("div"); txt.className = "hero-txt";
+  var meta = document.createElement("div"); meta.className = "meta";
+  var pid = document.createElement("span"); pid.className = "pill-id";
+  pid.textContent = idEl ? idEl.textContent.trim() : "";
+  var pcat = document.createElement("span"); pcat.textContent = cat;
+  meta.appendChild(pid); if (cat) meta.appendChild(pcat);
+  txt.appendChild(meta); txt.appendChild(h1);
+  hero.appendChild(ico); hero.appendChild(txt);
+  if (idEl) idEl.parentNode.replaceChild(hero, idEl); else c.insertBefore(hero, c.querySelector("table"));
+
+  // Etiqueta de disponibilidad + estrellas de desgaste
+  var chips = document.createElement("div"); chips.className = "chips";
+  var disp = valor("disponibilidad");
+  if (disp) {
+    var ch = document.createElement("span"); ch.className = "chip " + claseDisponibilidad(disp); ch.textContent = disp;
+    chips.appendChild(ch);
+  }
+  var desg = valor("desgaste");
+  if (/[★☆]/.test(desg)) {
+    var est = document.createElement("span"); est.className = "estrellas";
+    est.setAttribute("aria-label", "Desgaste: " + (desg.match(/★/g) || []).length + " de " + desg.replace(/[^★☆]/g, "").length);
+    desg.replace(/[^★☆]/g, "").split("").forEach(function (s) {
+      var sp = document.createElement("span"); sp.className = s === "★" ? "llena" : "vacia"; sp.textContent = "★"; est.appendChild(sp);
+    });
+    chips.appendChild(est);
+  }
+  if (chips.childNodes.length) c.insertBefore(chips, c.querySelector("table"));
+  ["categoria", "disponibilidad", "desgaste"].forEach(function (k) {
+    if (filas[k] && (k !== "desgaste" || /[★☆]/.test(desg))) filas[k].tr.className = "oculta";
+  });
+
+  // Íconos en las etiquetas y "hace N días" en la verificación
+  var etiquetas = { "ubicacion": "📍", "ult. verificacion": "✅", "notas": "📝" };
+  Object.keys(etiquetas).forEach(function (k) {
+    if (!filas[k]) return;
+    var s = document.createElement("span"); s.className = "ico"; s.setAttribute("aria-hidden", "true"); s.textContent = etiquetas[k];
+    filas[k].th.insertBefore(s, filas[k].th.firstChild);
+  });
+  var fv = filas["ult. verificacion"];
+  if (fv) {
+    var crudo = fv.td.textContent.trim(), rel = hace(crudo);
+    if (rel) {
+      fv.td.textContent = fechaLinda(crudo);
+      var r = document.createElement("span"); r.className = "rel"; r.textContent = rel; fv.td.appendChild(r);
+    }
+  }
+}
+
 function pintar(res) {
-  if (res.titulo) document.title = res.titulo;
+  if (res.titulo) document.title = res.titulo + " · Inventario";
   if (res.sesionVencida) ls(CLAVE_T, null);
   if (res.token) ls(CLAVE_T, res.token);
-  if (res.html) tarjeta().innerHTML = res.html;
-  else if (res.titulo) soloMensaje(res.titulo);
+  if (res.html) { tarjeta().innerHTML = res.html; decorar(); animar(); }
+  else if (res.titulo) soloMensaje(res.titulo, /no encontrado/i.test(res.titulo) ? "🔍" : "🏷️");
   else botones(true);
   if (res.error) aviso(res.error, "err");
   recordar();
@@ -86,7 +437,7 @@ function llamar(fn, args, espera) {
     .then(pintar)
     .catch(function () {
       botones(true);
-      if (!document.getElementById("msg")) soloMensaje("Inventario");
+      if (!tarjeta().querySelector("h1")) soloMensaje("Sin conexión", "📡");
       aviso("No se pudo conectar con el inventario. Revisá la señal y probá de nuevo.", "err");
     });
 }
@@ -108,7 +459,7 @@ function guardar() {
 }
 
 if (ID_ART) llamar("escaneo", [ID_ART, ls(CLAVE_T)]);
-else { soloMensaje("Falta el ID"); aviso("El QR no tiene un ID de artículo.", "err"); }
+else { soloMensaje("Falta el ID", "🏷️"); aviso("El QR no tiene un ID de artículo.", "err"); }
 </script>
 </body>
 </html>
